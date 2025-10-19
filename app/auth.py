@@ -32,7 +32,7 @@ def create_magic_link(email: str) -> str:
     
     # In a real app, you would send this link via email
     # For now, we'll just log it to the console
-    link = f"http://localhost:4200/auth/verify?token={token}"
+    link = f"http://localhost:4200/verify?token={token}"
     logging.info(f"Magic link for {email}: {link}")
     
     return token

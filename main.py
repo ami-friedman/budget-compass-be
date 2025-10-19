@@ -4,6 +4,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
 from typing import Optional
 from datetime import timedelta
+from pydantic import BaseModel
 import logging
 
 from app.database import get_session, create_db_and_tables
@@ -31,6 +32,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Request models
+class LoginRequest(BaseModel):
+    email: str
+
 # Create tables on startup
 @app.on_event("startup")
 def on_startup():
@@ -46,22 +51,29 @@ async def health_check():
 
 # Authentication endpoints
 @app.post("/api/auth/login")
-async def login(email: str):
+async def login(request: LoginRequest):
     """Request a magic link login."""
-    if not email or "@" not in email:
+    if not request.email or "@" not in request.email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid email address"
         )
     
     # Create a magic link and log it (in a real app, send via email)
-    token = create_magic_link(email)
+    token = create_magic_link(request.email)
     
     return {"message": "Magic link created. Check the server logs."}
 
-@app.get("/api/auth/verify")
-async def verify(token: str, session: Session = Depends(get_session)):
+@app.post("/api/auth/verify")
+async def verify(request: dict, session: Session = Depends(get_session)):
     """Verify a magic link and return a JWT token."""
+    if "token" not in request:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token is required"
+        )
+    
+    token = request["token"]
     user = verify_magic_link(token, session)
     if not user:
         raise HTTPException(
