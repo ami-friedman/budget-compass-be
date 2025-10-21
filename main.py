@@ -19,6 +19,7 @@ from app.auth import (
 from app.budgets import router as budgets_router
 from app.categories import router as categories_router
 from app.budget_items import router as budget_items_router
+from app.transactions import router as transactions_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -39,6 +40,7 @@ app.add_middleware(
 app.include_router(budgets_router)
 app.include_router(categories_router)
 app.include_router(budget_items_router)
+app.include_router(transactions_router)
 
 # Request models
 class LoginRequest(BaseModel):

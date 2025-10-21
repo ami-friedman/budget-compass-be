@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
+from decimal import Decimal
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -15,6 +16,7 @@ class User(SQLModel, table=True):
     # Relationships
     budgets: List["Budget"] = Relationship(back_populates="user")
     categories: List["Category"] = Relationship(back_populates="user")
+    transactions: List["Transaction"] = Relationship(back_populates="user")
 
 class UserCreate(SQLModel):
     email: str
@@ -114,3 +116,50 @@ class BudgetItemRead(SQLModel):
     budget_id: int
     category_id: int
     is_active: bool
+
+class AccountType(str, Enum):
+    CHECKING = "checking"
+    SAVINGS = "savings"
+
+class Transaction(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    amount: Decimal = Field(max_digits=10, decimal_places=2)
+    description: Optional[str] = None  # Made optional
+    transaction_date: datetime = Field(default_factory=datetime.utcnow)
+    account_type: AccountType  # Which physical account (checking/savings)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    deleted_at: Optional[datetime] = None
+    
+    # Foreign keys
+    budget_item_id: int = Field(foreign_key="budgetitem.id")
+    user_id: int = Field(foreign_key="user.id")
+    
+    # Relationships
+    budget_item: BudgetItem = Relationship()
+    user: User = Relationship()
+
+class TransactionCreate(SQLModel):
+    amount: Decimal
+    description: Optional[str] = None  # Made optional
+    transaction_date: Optional[datetime] = None
+    budget_item_id: int
+    account_type: AccountType  # User explicitly chooses which account
+
+class TransactionRead(SQLModel):
+    id: int
+    amount: Decimal
+    description: Optional[str] = None  # Made optional
+    transaction_date: datetime
+    account_type: AccountType
+    budget_item_id: int
+    is_active: bool
+    created_at: datetime
+
+class TransactionUpdate(SQLModel):
+    amount: Optional[Decimal] = None
+    description: Optional[str] = None
+    transaction_date: Optional[datetime] = None
+    budget_item_id: Optional[int] = None
+    account_type: Optional[AccountType] = None
