@@ -14,6 +14,7 @@ class User(SQLModel, table=True):
     
     # Relationships
     budgets: List["Budget"] = Relationship(back_populates="user")
+    categories: List["Category"] = Relationship(back_populates="user")
 
 class UserCreate(SQLModel):
     email: str
@@ -26,38 +27,27 @@ class UserRead(SQLModel):
     is_active: bool
     created_at: datetime
 
-class CategoryType(str, Enum):
-    INCOME = "income"
-    CASH = "cash"
-    MONTHLY = "monthly"
-    SAVINGS = "savings"
-
 class Category(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
-    type: CategoryType
-    description: Optional[str] = None
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     deleted_at: Optional[datetime] = None
     
     # Foreign keys
-    user_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    user_id: int = Field(foreign_key="user.id")
     
     # Relationships
+    user: "User" = Relationship(back_populates="categories")
     budget_items: List["BudgetItem"] = Relationship(back_populates="category")
 
 class CategoryCreate(SQLModel):
     name: str
-    type: CategoryType
-    description: Optional[str] = None
 
 class CategoryRead(SQLModel):
     id: int
     name: str
-    type: CategoryType
-    description: Optional[str] = None
     is_active: bool
 
 class Budget(SQLModel, table=True):
@@ -89,9 +79,14 @@ class BudgetRead(SQLModel):
     is_active: bool
     created_at: datetime
 
+class AccountType(str, Enum):
+    CHECKING = "checking"
+    SAVINGS = "savings"
+
 class BudgetItem(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     amount: float
+    account_type: AccountType
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -107,12 +102,14 @@ class BudgetItem(SQLModel, table=True):
 
 class BudgetItemCreate(SQLModel):
     amount: float
+    account_type: AccountType
     budget_id: int
     category_id: int
 
 class BudgetItemRead(SQLModel):
     id: int
     amount: float
+    account_type: AccountType
     budget_id: int
     category_id: int
     is_active: bool

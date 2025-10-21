@@ -17,6 +17,8 @@ from app.auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from app.budgets import router as budgets_router
+from app.categories import router as categories_router
+from app.budget_items import router as budget_items_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -27,7 +29,7 @@ app = FastAPI(title="Budget Compass API", version="1.0.0")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200"],  # Angular dev server
+    allow_origins=["http://localhost:4200","http://localhost:61990" ],  # Angular dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,6 +37,8 @@ app.add_middleware(
 
 # Include routers
 app.include_router(budgets_router)
+app.include_router(categories_router)
+app.include_router(budget_items_router)
 
 # Request models
 class LoginRequest(BaseModel):
@@ -102,3 +106,4 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
