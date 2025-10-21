@@ -28,8 +28,22 @@ def create_budget_item(
     if not budget or budget.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Budget not found")
 
-    # Ensure the category belongs to the user (assuming category_id is in budget_item)
-    # This check will be more robust once the category endpoints are fully integrated
+    # Check if this category is already in the budget with the same category type
+    existing_item = session.exec(
+        select(BudgetItem)
+        .where(BudgetItem.budget_id == budget_id)
+        .where(BudgetItem.category_id == budget_item.category_id)
+        .where(BudgetItem.category_type == budget_item.category_type)
+        .where(BudgetItem.is_active == True)
+    ).first()
+    
+    if existing_item:
+        # Update the existing item instead of creating a new one
+        existing_item.amount = budget_item.amount
+        session.add(existing_item)
+        session.commit()
+        session.refresh(existing_item)
+        return existing_item
     
     db_budget_item = BudgetItem.model_validate(budget_item, update={"budget_id": budget_id})
     session.add(db_budget_item)

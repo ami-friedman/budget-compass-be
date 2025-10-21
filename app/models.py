@@ -79,14 +79,16 @@ class BudgetRead(SQLModel):
     is_active: bool
     created_at: datetime
 
-class AccountType(str, Enum):
-    CHECKING = "checking"
+class CategoryType(str, Enum):
+    INCOME = "income"
+    MONTHLY = "monthly"
     SAVINGS = "savings"
+    CASH = "cash"
 
 class BudgetItem(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     amount: float
-    account_type: AccountType
+    category_type: CategoryType
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -102,14 +104,13 @@ class BudgetItem(SQLModel, table=True):
 
 class BudgetItemCreate(SQLModel):
     amount: float
-    account_type: AccountType
-    budget_id: int
+    category_type: CategoryType
     category_id: int
 
 class BudgetItemRead(SQLModel):
     id: int
     amount: float
-    account_type: AccountType
+    category_type: CategoryType
     budget_id: int
     category_id: int
     is_active: bool
