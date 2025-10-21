@@ -16,6 +16,7 @@ from app.auth import (
     get_current_user,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
+from app.budgets import router as budgets_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +32,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(budgets_router)
 
 # Request models
 class LoginRequest(BaseModel):
@@ -51,7 +55,7 @@ async def health_check():
 
 # Authentication endpoints
 @app.post("/api/auth/login")
-async def login(request: LoginRequest):
+async def login(request: LoginRequest, session: Session = Depends(get_session)):
     """Request a magic link login."""
     if not request.email or "@" not in request.email:
         raise HTTPException(
@@ -60,7 +64,7 @@ async def login(request: LoginRequest):
         )
     
     # Create a magic link and log it (in a real app, send via email)
-    token = create_magic_link(request.email)
+    token = create_magic_link(request.email, session)
     
     return {"message": "Magic link created. Check the server logs."}
 

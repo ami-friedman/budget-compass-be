@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
 from app.database import get_session
 from app.models import User
+from app.default_data import create_default_categories
 import secrets
 import logging
 
@@ -22,8 +23,22 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 # Format: {token: email}
 magic_links = {}
 
-def create_magic_link(email: str) -> str:
-    """Create a magic link token for the given email."""
+def create_magic_link(email: str, session: Session) -> str:
+    """
+    Create a magic link token for the given email.
+    If the user does not exist, a new user will be created.
+    """
+    # Check if user exists
+    user = session.exec(select(User).where(User.email == email)).first()
+    if not user:
+        # Create a new user if they don't exist
+        user = User(email=email)
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        # Create default categories for the new user
+        create_default_categories(session, user.id)
+
     # Generate a secure random token
     token = secrets.token_urlsafe(32)
     
@@ -44,14 +59,8 @@ def verify_magic_link(token: str, session: Session) -> Optional[User]:
     
     email = magic_links.pop(token)  # Use the token only once
     
-    # Find or create the user
+    # Find the user
     user = session.exec(select(User).where(User.email == email)).first()
-    if not user:
-        # Create a new user if they don't exist
-        user = User(email=email)
-        session.add(user)
-        session.commit()
-        session.refresh(user)
     
     return user
 

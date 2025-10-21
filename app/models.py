@@ -1,6 +1,7 @@
-from sqlmodel import SQLModel, Field
-from typing import Optional
+from sqlmodel import SQLModel, Field, Relationship
+from typing import Optional, List
 from datetime import datetime
+from enum import Enum
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -10,6 +11,9 @@ class User(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     deleted_at: Optional[datetime] = None
+    
+    # Relationships
+    budgets: List["Budget"] = Relationship(back_populates="user")
 
 class UserCreate(SQLModel):
     email: str
@@ -21,3 +25,94 @@ class UserRead(SQLModel):
     name: Optional[str] = None
     is_active: bool
     created_at: datetime
+
+class CategoryType(str, Enum):
+    INCOME = "income"
+    CASH = "cash"
+    MONTHLY = "monthly"
+    SAVINGS = "savings"
+
+class Category(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True)
+    type: CategoryType
+    description: Optional[str] = None
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    deleted_at: Optional[datetime] = None
+    
+    # Foreign keys
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    
+    # Relationships
+    budget_items: List["BudgetItem"] = Relationship(back_populates="category")
+
+class CategoryCreate(SQLModel):
+    name: str
+    type: CategoryType
+    description: Optional[str] = None
+
+class CategoryRead(SQLModel):
+    id: int
+    name: str
+    type: CategoryType
+    description: Optional[str] = None
+    is_active: bool
+
+class Budget(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    month: int = Field(index=True)
+    year: int = Field(index=True)
+    name: str
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    deleted_at: Optional[datetime] = None
+    
+    # Foreign keys
+    user_id: int = Field(foreign_key="user.id")
+    
+    # Relationships
+    user: User = Relationship(back_populates="budgets")
+    budget_items: List["BudgetItem"] = Relationship(back_populates="budget")
+
+class BudgetCreate(SQLModel):
+    month: int
+    year: int
+
+class BudgetRead(SQLModel):
+    id: int
+    month: int
+    year: int
+    name: str
+    is_active: bool
+    created_at: datetime
+
+class BudgetItem(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    amount: float
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    deleted_at: Optional[datetime] = None
+    
+    # Foreign keys
+    budget_id: int = Field(foreign_key="budget.id")
+    category_id: int = Field(foreign_key="category.id")
+    
+    # Relationships
+    budget: Budget = Relationship(back_populates="budget_items")
+    category: Category = Relationship(back_populates="budget_items")
+
+class BudgetItemCreate(SQLModel):
+    amount: float
+    budget_id: int
+    category_id: int
+
+class BudgetItemRead(SQLModel):
+    id: int
+    amount: float
+    budget_id: int
+    category_id: int
+    is_active: bool
