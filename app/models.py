@@ -132,19 +132,22 @@ class Transaction(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     deleted_at: Optional[datetime] = None
     
-    # Foreign keys
-    budget_item_id: int = Field(foreign_key="budgetitem.id")
+    # Foreign keys - one of these will be set based on account_type
+    budget_item_id: Optional[int] = Field(default=None, foreign_key="budgetitem.id")  # For checking account
+    category_id: Optional[int] = Field(default=None, foreign_key="category.id")  # For savings account
     user_id: int = Field(foreign_key="user.id")
     
     # Relationships
-    budget_item: BudgetItem = Relationship()
-    user: User = Relationship()
+    budget_item: Optional[BudgetItem] = Relationship()
+    category: Optional[Category] = Relationship()
+    user: User = Relationship(back_populates="transactions")
 
 class TransactionCreate(SQLModel):
     amount: Decimal
     description: Optional[str] = None  # Made optional
     transaction_date: Optional[datetime] = None
-    budget_item_id: int
+    budget_item_id: Optional[int] = None  # For checking account transactions
+    category_id: Optional[int] = None  # For savings account transactions
     account_type: AccountType  # User explicitly chooses which account
 
 class TransactionRead(SQLModel):
@@ -153,7 +156,8 @@ class TransactionRead(SQLModel):
     description: Optional[str] = None  # Made optional
     transaction_date: datetime
     account_type: AccountType
-    budget_item_id: int
+    budget_item_id: Optional[int] = None  # For checking account transactions
+    category_id: Optional[int] = None  # For savings account transactions
     is_active: bool
     created_at: datetime
 
@@ -161,5 +165,6 @@ class TransactionUpdate(SQLModel):
     amount: Optional[Decimal] = None
     description: Optional[str] = None
     transaction_date: Optional[datetime] = None
-    budget_item_id: Optional[int] = None
+    budget_item_id: Optional[int] = None  # For checking account transactions
+    category_id: Optional[int] = None  # For savings account transactions
     account_type: Optional[AccountType] = None

@@ -7,7 +7,7 @@ from .database import get_session
 from .auth import get_current_user
 from .models import (
     Transaction, TransactionCreate, TransactionRead, TransactionUpdate,
-    BudgetItem, CategoryType, AccountType, User
+    BudgetItem, Category, CategoryType, AccountType, User
 )
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
@@ -20,30 +20,72 @@ def create_transaction(
 ):
     """Create a new transaction"""
     
-    # Verify the budget item exists and belongs to the user
-    budget_item = session.get(BudgetItem, transaction_data.budget_item_id)
-    if not budget_item:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Budget item not found"
+    # Validate based on account type
+    if transaction_data.account_type == AccountType.CHECKING:
+        # Checking transactions must have budget_item_id
+        if not transaction_data.budget_item_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Checking account transactions must specify a budget_item_id"
+            )
+        
+        # Verify the budget item exists and belongs to the user
+        budget_item = session.get(BudgetItem, transaction_data.budget_item_id)
+        if not budget_item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Budget item not found"
+            )
+        
+        # Check if budget item belongs to user's budget
+        if budget_item.budget.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Budget item does not belong to current user"
+            )
+        
+        # Create checking transaction
+        transaction = Transaction(
+            amount=transaction_data.amount,
+            description=transaction_data.description,
+            transaction_date=transaction_data.transaction_date or datetime.utcnow(),
+            account_type=transaction_data.account_type,
+            budget_item_id=transaction_data.budget_item_id,
+            user_id=current_user.id
         )
-    
-    # Check if budget item belongs to user's budget
-    if budget_item.budget.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Budget item does not belong to current user"
+        
+    elif transaction_data.account_type == AccountType.SAVINGS:
+        # Savings transactions must have category_id
+        if not transaction_data.category_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Savings account transactions must specify a category_id"
+            )
+        
+        # Verify the category exists and belongs to the user
+        category = session.get(Category, transaction_data.category_id)
+        if not category:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Category not found"
+            )
+        
+        # Check if category belongs to user
+        if category.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Category does not belong to current user"
+            )
+        
+        # Create savings transaction
+        transaction = Transaction(
+            amount=transaction_data.amount,
+            description=transaction_data.description,
+            transaction_date=transaction_data.transaction_date or datetime.utcnow(),
+            account_type=transaction_data.account_type,
+            category_id=transaction_data.category_id,
+            user_id=current_user.id
         )
-    
-    # Create transaction with user-specified account type
-    transaction = Transaction(
-        amount=transaction_data.amount,
-        description=transaction_data.description,
-        transaction_date=transaction_data.transaction_date or datetime.utcnow(),
-        account_type=transaction_data.account_type,
-        budget_item_id=transaction_data.budget_item_id,
-        user_id=current_user.id
-    )
     
     session.add(transaction)
     session.commit()
