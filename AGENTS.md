@@ -11,6 +11,18 @@ This document provides specific guidelines for developing the FastAPI backend of
 - **Migration Tool**: Alembic
 - **Package Management**: UV
 
+## Task Planning
+
+**IMPORTANT: Before starting any new task, always consult [`plan.md`](../plan.md) first.**
+
+- Check [`plan.md`](../plan.md) for existing project plans, architectural decisions, and ongoing work
+- Review any relevant context, requirements, or constraints documented in the plan
+- Update [`plan.md`](../plan.md) with your task breakdown and approach before implementation
+- Keep [`plan.md`](../plan.md) synchronized with actual progress and any changes to the plan
+- Use the plan as a single source of truth for project direction and task coordination
+
+This ensures all agents and developers are aligned on project goals, avoid duplicate work, and maintain consistency across the codebase.
+
 ## Project Structure
 
 ```

@@ -7,8 +7,10 @@ from .database import get_session
 from .auth import get_current_user
 from .models import (
     Transaction, TransactionCreate, TransactionRead, TransactionUpdate,
-    BudgetItem, Category, CategoryType, AccountType, User
+    BudgetItem, Category, CategoryType, AccountType, User,
+    SavingsCategoryBalance
 )
+from decimal import Decimal
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
@@ -54,6 +56,20 @@ def create_transaction(
             user_id=current_user.id
         )
         
+        session.add(transaction)
+        session.commit()
+        session.refresh(transaction)
+        
+        # If this is a savings budget item, update the savings balance
+        if budget_item.category_type == CategoryType.SAVINGS:
+            _update_savings_balance_for_funding(
+                session,
+                current_user.id,
+                budget_item.category_id,
+                transaction.amount,
+                transaction.id
+            )
+        
     elif transaction_data.account_type == AccountType.SAVINGS:
         # Savings transactions must have category_id
         if not transaction_data.category_id:
@@ -86,10 +102,19 @@ def create_transaction(
             category_id=transaction_data.category_id,
             user_id=current_user.id
         )
-    
-    session.add(transaction)
-    session.commit()
-    session.refresh(transaction)
+        
+        session.add(transaction)
+        session.commit()
+        session.refresh(transaction)
+        
+        # Update the savings balance for spending
+        _update_savings_balance_for_spending(
+            session,
+            current_user.id,
+            transaction_data.category_id,
+            transaction.amount,
+            transaction.id
+        )
     
     return transaction
 
@@ -164,6 +189,12 @@ def update_transaction(
             detail="Transaction does not belong to current user"
         )
     
+    # Store old values for balance adjustment
+    old_amount = transaction.amount
+    old_account_type = transaction.account_type
+    old_category_id = transaction.category_id
+    old_budget_item_id = transaction.budget_item_id
+    
     # Update fields if provided
     update_data = transaction_data.model_dump(exclude_unset=True)
     
@@ -190,6 +221,33 @@ def update_transaction(
     session.commit()
     session.refresh(transaction)
     
+    # Handle balance updates if amount or category changed
+    if old_account_type == AccountType.CHECKING and old_budget_item_id:
+        old_budget_item = session.get(BudgetItem, old_budget_item_id)
+        if old_budget_item and old_budget_item.category_type == CategoryType.SAVINGS:
+            # Reverse old funding
+            _update_savings_balance_for_funding(
+                session, current_user.id, old_budget_item.category_id, -old_amount, transaction.id
+            )
+            # Apply new funding if still a savings item
+            if transaction.budget_item_id:
+                new_budget_item = session.get(BudgetItem, transaction.budget_item_id)
+                if new_budget_item and new_budget_item.category_type == CategoryType.SAVINGS:
+                    _update_savings_balance_for_funding(
+                        session, current_user.id, new_budget_item.category_id, transaction.amount, transaction.id
+                    )
+    
+    elif old_account_type == AccountType.SAVINGS and old_category_id:
+        # Reverse old spending
+        _update_savings_balance_for_spending(
+            session, current_user.id, old_category_id, -old_amount, transaction.id
+        )
+        # Apply new spending
+        if transaction.category_id:
+            _update_savings_balance_for_spending(
+                session, current_user.id, transaction.category_id, transaction.amount, transaction.id
+            )
+    
     return transaction
 
 @router.delete("/{transaction_id}")
@@ -211,6 +269,21 @@ def delete_transaction(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Transaction does not belong to current user"
+        )
+    
+    # Reverse balance updates before soft delete
+    if transaction.account_type == AccountType.CHECKING and transaction.budget_item_id:
+        budget_item = session.get(BudgetItem, transaction.budget_item_id)
+        if budget_item and budget_item.category_type == CategoryType.SAVINGS:
+            # Reverse the funding
+            _update_savings_balance_for_funding(
+                session, current_user.id, budget_item.category_id, -transaction.amount, transaction.id
+            )
+    
+    elif transaction.account_type == AccountType.SAVINGS and transaction.category_id:
+        # Reverse the spending
+        _update_savings_balance_for_spending(
+            session, current_user.id, transaction.category_id, -transaction.amount, transaction.id
         )
     
     # Soft delete
@@ -285,3 +358,145 @@ def get_budget_transaction_summary(
             cat_data["remaining"] = cat_data["budgeted"] - cat_data["spent"]
     
     return summary
+
+def _update_savings_balance_for_funding(
+    session: Session,
+    user_id: int,
+    category_id: int,
+    amount: Decimal,
+    transaction_id: int
+):
+    """Update savings balance when a checking transaction funds a savings category"""
+    # Get or create balance record
+    balance = session.exec(
+        select(SavingsCategoryBalance).where(
+            SavingsCategoryBalance.user_id == user_id,
+            SavingsCategoryBalance.category_id == category_id
+        )
+    ).first()
+    
+    if not balance:
+        balance = SavingsCategoryBalance(
+            user_id=user_id,
+            category_id=category_id,
+            funded_amount=Decimal("0.00"),
+            spent_amount=Decimal("0.00"),
+            available_balance=Decimal("0.00")
+        )
+        session.add(balance)
+    
+    # Update funded amount and available balance
+    balance.funded_amount += amount
+    balance.available_balance = balance.funded_amount - balance.spent_amount
+    balance.last_transaction_id = transaction_id
+    balance.updated_at = datetime.utcnow()
+    
+    session.commit()
+
+def _update_savings_balance_for_spending(
+    session: Session,
+    user_id: int,
+    category_id: int,
+    amount: Decimal,
+    transaction_id: int
+):
+    """Update savings balance when a savings transaction spends from a category"""
+    # Get balance record (should exist if category was funded)
+    balance = session.exec(
+        select(SavingsCategoryBalance).where(
+            SavingsCategoryBalance.user_id == user_id,
+            SavingsCategoryBalance.category_id == category_id
+        )
+    ).first()
+    
+    if not balance:
+        # Create balance record even if not previously funded (allows negative balance)
+        balance = SavingsCategoryBalance(
+            user_id=user_id,
+            category_id=category_id,
+            funded_amount=Decimal("0.00"),
+            spent_amount=Decimal("0.00"),
+            available_balance=Decimal("0.00")
+        )
+        session.add(balance)
+    
+    # Update spent amount and available balance
+    balance.spent_amount += amount
+    balance.available_balance = balance.funded_amount - balance.spent_amount
+    balance.last_transaction_id = transaction_id
+    balance.updated_at = datetime.utcnow()
+    
+    session.commit()
+
+@router.get("/savings/balances", response_model=List[dict])
+def get_savings_balances(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all savings category balances for the current user"""
+    
+    balances = session.exec(
+        select(SavingsCategoryBalance).where(
+            SavingsCategoryBalance.user_id == current_user.id
+        )
+    ).all()
+    
+    # Enrich with category names
+    result = []
+    for balance in balances:
+        category = session.get(Category, balance.category_id)
+        if category:
+            result.append({
+                "id": balance.id,
+                "category_id": balance.category_id,
+                "category_name": category.name,
+                "funded_amount": float(balance.funded_amount),
+                "spent_amount": float(balance.spent_amount),
+                "available_balance": float(balance.available_balance),
+                "updated_at": balance.updated_at
+            })
+    
+    return result
+
+@router.get("/savings/balances/{category_id}")
+def get_category_balance(
+    category_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get savings balance for a specific category"""
+    
+    # Verify category belongs to user
+    category = session.get(Category, category_id)
+    if not category or category.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Category not found"
+        )
+    
+    balance = session.exec(
+        select(SavingsCategoryBalance).where(
+            SavingsCategoryBalance.user_id == current_user.id,
+            SavingsCategoryBalance.category_id == category_id
+        )
+    ).first()
+    
+    if not balance:
+        # Return zero balance if not funded yet
+        return {
+            "category_id": category_id,
+            "category_name": category.name,
+            "funded_amount": 0.0,
+            "spent_amount": 0.0,
+            "available_balance": 0.0
+        }
+    
+    return {
+        "id": balance.id,
+        "category_id": balance.category_id,
+        "category_name": category.name,
+        "funded_amount": float(balance.funded_amount),
+        "spent_amount": float(balance.spent_amount),
+        "available_balance": float(balance.available_balance),
+        "updated_at": balance.updated_at
+    }

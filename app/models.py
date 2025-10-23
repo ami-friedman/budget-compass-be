@@ -167,4 +167,31 @@ class TransactionUpdate(SQLModel):
     transaction_date: Optional[datetime] = None
     budget_item_id: Optional[int] = None  # For checking account transactions
     category_id: Optional[int] = None  # For savings account transactions
+
+class SavingsCategoryBalance(SQLModel, table=True):
+    """Tracks running balances for savings categories"""
+    __tablename__ = "savings_category_balances"
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    funded_amount: Decimal = Field(default=Decimal("0.00"), max_digits=10, decimal_places=2)
+    spent_amount: Decimal = Field(default=Decimal("0.00"), max_digits=10, decimal_places=2)
+    available_balance: Decimal = Field(default=Decimal("0.00"), max_digits=10, decimal_places=2)
+    last_transaction_id: Optional[int] = None
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Foreign keys
+    user_id: int = Field(foreign_key="user.id")
+    category_id: int = Field(foreign_key="category.id", unique=True)
+    
+    # Relationships
+    user: "User" = Relationship()
+    category: "Category" = Relationship()
+
+class SavingsCategoryBalanceRead(SQLModel):
+    id: int
+    category_id: int
+    funded_amount: Decimal
+    spent_amount: Decimal
+    available_balance: Decimal
+    updated_at: datetime
     account_type: Optional[AccountType] = None
