@@ -195,3 +195,41 @@ class SavingsCategoryBalanceRead(SQLModel):
     available_balance: Decimal
     updated_at: datetime
     account_type: Optional[AccountType] = None
+
+# Month's End Summary Models
+class CategorySummary(SQLModel):
+    """Summary for a single category type"""
+    budgeted: float
+    actual: float
+    variance: float
+    variance_percentage: float
+
+class ExpenseBreakdown(SQLModel):
+    """Breakdown of expenses by category type"""
+    cash: CategorySummary
+    monthly: CategorySummary
+    savings: CategorySummary
+
+class ExpensesSummary(SQLModel):
+    """Total expenses with breakdown"""
+    total_budgeted: float
+    total_actual: float
+    total_variance: float
+    breakdown: ExpenseBreakdown
+
+class NetPosition(SQLModel):
+    """Net financial position"""
+    budgeted: float
+    actual: float
+    variance: float
+
+class MonthsEndSummary(SQLModel):
+    """Complete month's end summary"""
+    budget_id: Optional[int]
+    month: int
+    year: int
+    budget_name: Optional[str]
+    has_budget: bool
+    income: CategorySummary
+    expenses: ExpensesSummary
+    net_position: NetPosition
