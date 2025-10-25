@@ -122,19 +122,55 @@ def create_transaction(
 def get_transactions(
     budget_id: int = None,
     account_type: AccountType = None,
+    month: int = None,
+    year: int = None,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Get transactions for the current user, optionally filtered by budget or account type"""
+    """Get transactions for the current user, optionally filtered by budget, account type, or month/year"""
     
     query = select(Transaction).where(
         Transaction.user_id == current_user.id,
         Transaction.is_active == True
     )
     
-    if budget_id:
-        # Filter by budget through budget_item relationship
+    # When filtering by budget_id with month/year, we need to handle both checking and savings
+    if budget_id and month is not None and year is not None:
+        # For checking transactions: filter through budget_item relationship
+        # For savings transactions: just filter by month/year (they don't have budget_item_id)
+        from sqlalchemy import extract, or_
+        
+        checking_filter = (
+            Transaction.account_type == AccountType.CHECKING
+        ).self_group()
+        
+        savings_filter = (
+            Transaction.account_type == AccountType.SAVINGS
+        ).self_group()
+        
+        # Apply month/year filter to all transactions
+        query = query.where(
+            extract('month', Transaction.transaction_date) == month,
+            extract('year', Transaction.transaction_date) == year
+        )
+        
+        # For checking transactions, also filter by budget
+        query = query.outerjoin(BudgetItem).where(
+            or_(
+                checking_filter & (BudgetItem.budget_id == budget_id),
+                savings_filter
+            )
+        )
+    elif budget_id:
+        # Filter by budget through budget_item relationship (checking only)
         query = query.join(BudgetItem).where(BudgetItem.budget_id == budget_id)
+    elif month is not None and year is not None:
+        # Filter by month and year only
+        from sqlalchemy import extract
+        query = query.where(
+            extract('month', Transaction.transaction_date) == month,
+            extract('year', Transaction.transaction_date) == year
+        )
     
     if account_type:
         query = query.where(Transaction.account_type == account_type)

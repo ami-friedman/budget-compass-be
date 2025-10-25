@@ -157,6 +157,27 @@ async def get_current_budget(
     
     return budget
 
+@router.get("/by-month", response_model=Optional[BudgetRead])
+async def get_budget_by_month(
+    month: int = Query(..., ge=1, le=12, description="Month (1-12)"),
+    year: int = Query(..., ge=2000, le=2100, description="Year"),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """Get a budget for a specific month and year."""
+    budget = session.exec(
+        select(Budget)
+        .where(Budget.user_id == current_user.id)
+        .where(Budget.month == month)
+        .where(Budget.year == year)
+        .where(Budget.is_active == True)
+    ).first()
+    
+    if not budget:
+        return None
+    
+    return budget
+
 @router.get("/months-end-summary", response_model=MonthsEndSummary)
 async def get_months_end_summary(
     month: int = Query(..., ge=1, le=12, description="Month (1-12)"),
