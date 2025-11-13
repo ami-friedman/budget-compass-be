@@ -6,8 +6,8 @@ from decimal import Decimal
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    email: str = Field(unique=True, index=True)
-    name: Optional[str] = None
+    email: str = Field(max_length=255, unique=True, index=True)
+    name: Optional[str] = Field(default=None, max_length=255)
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -31,7 +31,7 @@ class UserRead(SQLModel):
 
 class Category(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
+    name: str = Field(max_length=255, index=True)
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -56,7 +56,7 @@ class Budget(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     month: int = Field(index=True)
     year: int = Field(index=True)
-    name: str
+    name: str = Field(max_length=255)
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -90,7 +90,7 @@ class CategoryType(str, Enum):
 class BudgetItem(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     amount: float
-    category_type: CategoryType
+    category_type: CategoryType = Field(max_length=50)
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -124,9 +124,9 @@ class AccountType(str, Enum):
 class Transaction(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     amount: Decimal = Field(max_digits=10, decimal_places=2)
-    description: Optional[str] = None  # Made optional
+    description: Optional[str] = Field(default=None, max_length=500)
     transaction_date: datetime = Field(default_factory=datetime.utcnow)
-    account_type: AccountType  # Which physical account (checking/savings)
+    account_type: AccountType = Field(max_length=50)
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

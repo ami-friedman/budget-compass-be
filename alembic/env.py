@@ -20,6 +20,12 @@ from app.models import User, Budget, Category, BudgetItem
 from sqlmodel import SQLModel
 target_metadata = SQLModel.metadata
 
+# Import database URL construction from app.database
+from app.database import get_database_url
+
+# Override the sqlalchemy.url in alembic.ini with the constructed URL
+config.set_main_option("sqlalchemy.url", get_database_url())
+
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
