@@ -30,7 +30,8 @@ app = FastAPI(title="Budget Compass API", version="1.0.0")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200","http://localhost:61990" ],  # Angular dev server
+     allow_origins=["http://localhost:4200", "http://127.0.0.1:4200",
+                    "https://budget-compass.netlify.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
