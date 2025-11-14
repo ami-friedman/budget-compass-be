@@ -26,6 +26,8 @@ def get_database_url() -> str:
     Returns:
         str: Database connection URL
     """
+    if database_url := os.getenv("DATABASE_URL"):
+        return database_url
     # Check for complete DATABASE_URL first
     # Construct MySQL URL from individual variables
     db_user = os.getenv("DB_USER")
